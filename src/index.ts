@@ -56,6 +56,22 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
+// ─── Tool 0: get_info ─────────────────────────────────────────────────────
+server.tool(
+  "get_info",
+  "Vérifie que la connexion à AgentGate fonctionne et retourne le nom de l'assistant IA et de l'organisation connectée.",
+  {},
+  async () => {
+    const info = await api("GET", "/api/v1/me");
+    const lines = [
+      `✅ Connexion AgentGate établie`,
+      `Organisation : ${info.organization.name}`,
+      `Assistant : ${info.agent.name}${info.agent.sandbox ? " (mode sandbox)" : ""}`,
+    ];
+    return { content: [{ type: "text", text: lines.join("\n") }] };
+  }
+);
+
 // ─── Tool 1: submit_payment ────────────────────────────────────────────────
 server.tool(
   "submit_payment",
