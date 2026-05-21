@@ -1,4 +1,4 @@
-# @agentgate/mcp-server
+# @agentgateeu/mcp-server
 
 MCP server for [AgentGate](https://agentgate.eu) — lets Claude Desktop submit and track AI payment requests through your authorization rules.
 
@@ -12,7 +12,7 @@ MCP server for [AgentGate](https://agentgate.eu) — lets Claude Desktop submit 
   "mcpServers": {
     "agentgate": {
       "command": "/usr/local/bin/npx",
-      "args": ["-y", "@agentgate/mcp-server"],
+      "args": ["-y", "@agentgateeu/mcp-server"],
       "env": {
         "AGENTGATE_API_KEY": "your-connection-key-here"
       }

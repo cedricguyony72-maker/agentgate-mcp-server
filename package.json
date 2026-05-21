@@ -1,5 +1,5 @@
 {
-  "name": "@agentgate/mcp-server",
+  "name": "@agentgateeu/mcp-server",
   "version": "1.0.0",
   "description": "MCP server for AgentGate — submit and authorize AI payment requests from Claude Desktop",
   "type": "module",
