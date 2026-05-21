@@ -89,7 +89,54 @@ server.tool(
   }
 );
 
-// ─── Tool 1: submit_payment ────────────────────────────────────────────────
+// ─── Tool 1: list_payments ────────────────────────────────────────────────
+server.tool(
+  "list_payments",
+  "Liste les dernières demandes de paiement de l'organisation (ou uniquement de cet agent). Utile pour faire un résumé ou vérifier l'activité récente.",
+  {
+    limit: z.number().int().min(1).max(50).default(10).describe("Nombre de demandes à retourner (défaut : 10, max : 50)"),
+    agent_only: z.boolean().default(false).describe("Si true, retourne uniquement les demandes de cet assistant. Si false, toute l'organisation."),
+  },
+  async ({ limit, agent_only }) => {
+    const params = new URLSearchParams({ limit: String(limit), agent: String(agent_only) });
+    const intents = await api("GET", `/api/v1/payment-intents?${params}`) as unknown as Record<string, unknown>[];
+    if (!Array.isArray(intents) || intents.length === 0) {
+      return { content: [{ type: "text", text: "Aucune demande de paiement trouvée." }] };
+    }
+    const lines = intents.map((i) => {
+      const amount = (Number(i.amountMinor) / 100).toFixed(2);
+      const raw = i.beneficiaryRaw as { name?: string } | undefined;
+      const beneficiary = raw?.name ?? "—";
+      return `• ${i.status} — ${amount} ${i.currency} → ${beneficiary} (${String(i.createdAt).slice(0, 10)})`;
+    });
+    return { content: [{ type: "text", text: `${intents.length} demande(s) :\n${lines.join("\n")}` }] };
+  }
+);
+
+// ─── Tool 2: list_policies ────────────────────────────────────────────────
+server.tool(
+  "list_policies",
+  "Liste les règles d'autorisation actives de l'organisation applicables à cet assistant. Permet de savoir ce qui sera approuvé automatiquement, refusé ou envoyé en validation humaine.",
+  {},
+  async () => {
+    const policies = await api("GET", "/api/v1/policies") as unknown as Record<string, unknown>[];
+    if (!Array.isArray(policies) || policies.length === 0) {
+      return { content: [{ type: "text", text: "Aucune règle active configurée." }] };
+    }
+    const actionLabel: Record<string, string> = {
+      AUTO_APPROVE: "✅ Approuvé automatiquement",
+      REQUIRE_HUMAN: "👤 Validation humaine requise",
+      REJECT: "❌ Refusé automatiquement",
+    };
+    const lines = policies.map((p) => {
+      const action = actionLabel[p.action as string] ?? String(p.action);
+      return `• ${p.name} → ${action} (priorité ${p.priority})`;
+    });
+    return { content: [{ type: "text", text: `${policies.length} règle(s) active(s) :\n${lines.join("\n")}` }] };
+  }
+);
+
+// ─── Tool 3: submit_payment ────────────────────────────────────────────────
 server.tool(
   "submit_payment",
   [
@@ -131,7 +178,7 @@ server.tool(
   }
 );
 
-// ─── Tool 2: get_payment_status ────────────────────────────────────────────
+// ─── Tool 4: get_payment_status ────────────────────────────────────────────
 server.tool(
   "get_payment_status",
   "Récupère le statut actuel d'une demande de paiement à partir de son ID.",
@@ -144,7 +191,7 @@ server.tool(
   }
 );
 
-// ─── Tool 3: wait_for_decision ─────────────────────────────────────────────
+// ─── Tool 5: wait_for_decision ─────────────────────────────────────────────
 server.tool(
   "wait_for_decision",
   "Attend qu'une demande de paiement en attente de validation humaine soit approuvée ou refusée. À utiliser après submit_payment quand le statut retourné est PENDING_HUMAN_REVIEW.",
@@ -178,7 +225,7 @@ server.tool(
   }
 );
 
-// ─── Tool 4: cancel_payment ────────────────────────────────────────────────
+// ─── Tool 6: cancel_payment ────────────────────────────────────────────────
 server.tool(
   "cancel_payment",
   "Annule une demande de paiement en attente.",
