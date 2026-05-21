@@ -116,23 +116,61 @@ server.tool(
 // ─── Tool 2: list_policies ────────────────────────────────────────────────
 server.tool(
   "list_policies",
-  "Liste les règles d'autorisation actives de l'organisation applicables à cet assistant. Permet de savoir ce qui sera approuvé automatiquement, refusé ou envoyé en validation humaine.",
+  "Liste les règles d'autorisation actives applicables à cet assistant, avec leur détail complet. Indique pour chaque règle si elle est générique (s'applique à tous les agents) ou spécifique à cet assistant.",
   {},
   async () => {
     const policies = await api("GET", "/api/v1/policies") as unknown as Record<string, unknown>[];
     if (!Array.isArray(policies) || policies.length === 0) {
       return { content: [{ type: "text", text: "Aucune règle active configurée." }] };
     }
+
     const actionLabel: Record<string, string> = {
       AUTO_APPROVE: "✅ Approuvé automatiquement",
       REQUIRE_HUMAN: "👤 Validation humaine requise",
       REJECT: "❌ Refusé automatiquement",
     };
-    const lines = policies.map((p) => {
+
+    function describeConfig(ruleType: string, config: Record<string, unknown>): string {
+      switch (ruleType) {
+        case "AMOUNT_THRESHOLD":
+          return `Montant > ${((Number(config.maxAmountMinor ?? config.amountMinor ?? 0)) / 100).toFixed(2)} ${config.currency ?? "EUR"}`;
+        case "DAILY_CAP":
+          return `Plafond journalier : ${((Number(config.capMinor ?? 0)) / 100).toFixed(2)} ${config.currency ?? "EUR"}`;
+        case "BENEFICIARY_WHITELIST":
+          return `Destinataires autorisés : ${Array.isArray(config.beneficiaryIds) ? config.beneficiaryIds.length + " configuré(s)" : "—"}`;
+        case "CATEGORY_BLOCKLIST":
+          return `Catégories bloquées : ${Array.isArray(config.categories) ? config.categories.join(", ") : "—"}`;
+        case "TIME_WINDOW":
+          return `Fenêtre horaire : ${config.startHour}h–${config.endHour}h (${config.timezone ?? "UTC"})`;
+        default:
+          return JSON.stringify(config);
+      }
+    }
+
+    const generic: string[] = [];
+    const specific: string[] = [];
+
+    for (const p of policies) {
       const action = actionLabel[p.action as string] ?? String(p.action);
-      return `• ${p.name} → ${action} (priorité ${p.priority})`;
-    });
-    return { content: [{ type: "text", text: `${policies.length} règle(s) active(s) :\n${lines.join("\n")}` }] };
+      const config = (p.config ?? {}) as Record<string, unknown>;
+      const detail = describeConfig(p.ruleType as string, config);
+      const line = `  • [${p.ruleType}] ${p.name}\n    → ${action}\n    → Condition : ${detail}\n    → Priorité : ${p.priority}`;
+      if (p.agentId === null) {
+        generic.push(line);
+      } else {
+        specific.push(line);
+      }
+    }
+
+    const sections: string[] = [];
+    if (generic.length > 0) {
+      sections.push(`Règles génériques (s'appliquent à tous les agents) :\n${generic.join("\n\n")}`);
+    }
+    if (specific.length > 0) {
+      sections.push(`Règles spécifiques à cet assistant :\n${specific.join("\n\n")}`);
+    }
+
+    return { content: [{ type: "text", text: `${policies.length} règle(s) active(s) :\n\n${sections.join("\n\n")}` }] };
   }
 );
 
