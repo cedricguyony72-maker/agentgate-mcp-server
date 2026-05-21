@@ -130,18 +130,41 @@ server.tool(
       REJECT: "❌ Refusé automatiquement",
     };
 
+    const WEEKDAYS = ["", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+    const OPERATORS: Record<string, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
+    const PERIODS: Record<string, string> = { hour: "heure", day: "jour", week: "semaine", month: "mois" };
+
     function describeConfig(ruleType: string, config: Record<string, unknown>): string {
       switch (ruleType) {
-        case "AMOUNT_THRESHOLD":
-          return `Montant > ${((Number(config.maxAmountMinor ?? config.amountMinor ?? 0)) / 100).toFixed(2)} ${config.currency ?? "EUR"}`;
-        case "DAILY_CAP":
-          return `Plafond journalier : ${((Number(config.capMinor ?? 0)) / 100).toFixed(2)} ${config.currency ?? "EUR"}`;
+        case "AMOUNT_THRESHOLD": {
+          const op = OPERATORS[config.operator as string] ?? ">";
+          const amount = (Number(config.amountMinor ?? 0) / 100).toFixed(2);
+          return `Montant ${op} ${amount} ${config.currency ?? "EUR"}`;
+        }
+        case "DAILY_CAP": {
+          const amount = (Number(config.capMinor ?? 0) / 100).toFixed(2);
+          const period = PERIODS[config.period as string] ?? "jour";
+          const scope = config.scope === "agent" ? "cet assistant" : "toute l'organisation";
+          return `Plafond de ${amount} ${config.currency ?? "EUR"} par ${period} pour ${scope}`;
+        }
         case "BENEFICIARY_WHITELIST":
-          return `Destinataires autorisés : ${Array.isArray(config.beneficiaryIds) ? config.beneficiaryIds.length + " configuré(s)" : "—"}`;
+          return `Seuls les destinataires de la liste blanche sont autorisés`;
         case "CATEGORY_BLOCKLIST":
           return `Catégories bloquées : ${Array.isArray(config.categories) ? config.categories.join(", ") : "—"}`;
-        case "TIME_WINDOW":
-          return `Fenêtre horaire : ${config.startHour}h–${config.endHour}h (${config.timezone ?? "UTC"})`;
+        case "TIME_WINDOW": {
+          const days = Array.isArray(config.weekdays)
+            ? (config.weekdays as number[]).map((d) => WEEKDAYS[d] ?? d).join(", ")
+            : "tous les jours";
+          const tz = config.tz ?? "UTC";
+          return `Jours : ${days} | Horaires : ${config.startHm}–${config.endHm} (${tz})`;
+        }
+        case "AGENT_SCOPE": {
+          const ids = Array.isArray(config.allowedAgentIds) ? config.allowedAgentIds.length : 0;
+          const cap = config.maxAmountMinor != null
+            ? ` | Plafond : ${(Number(config.maxAmountMinor) / 100).toFixed(2)} EUR`
+            : "";
+          return `Limité à ${ids} assistant(s) autorisé(s)${cap}`;
+        }
         default:
           return JSON.stringify(config);
       }
